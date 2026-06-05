@@ -9,7 +9,7 @@ export const CAROUSEL_INTERVAL_MS = 4000;
 
 export const carouselMembers: CarouselMember[] = [
   { name: 'un1verso_', image: '/skins/un1verso.png', bgColor: '#4e4e4eff' }, // Esempio: Viola
-  { name: 'zZalix', image: '/skins/zZalix.png', bgColor: '#fc55f4ff' }, // Esempio: Primary Blue
+  { name: 'zZalix', image: '/skins/zZalix.png', bgColor: '#89abffff' }, // Esempio: Primary Blue
   { name: 'Pirata91', image: '/skins/Pirata91.png', bgColor: '#212222ff' }, // Esempio: Blu chiaro
   { name: "aeveloy", image: '/skins/a\'.png', bgColor: '#BD9462' },
   { name: 'gabryX2', image: '/skins/gabryX2.png', bgColor: '#36a336ff' }, // Esempio: Verde Lime

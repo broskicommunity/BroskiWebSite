@@ -709,16 +709,24 @@ const AdminPanel: React.FC = () => {
                     SALVA
                   </button>
                   {/* ITA/ENG Switch */}
-                  <div className="flex items-center gap-2 rounded-xl border-[3px] border-black bg-surface-container px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-                    <span className={`font-label-caps text-[11px] ${newsLang === 'it' ? 'text-primary-container font-bold' : 'text-on-surface-variant'}`}>ITA</span>
-                    <button
-                      type="button"
-                      onClick={() => setNewsLang(newsLang === 'it' ? 'en' : 'it')}
-                      className={`relative h-6 w-11 rounded-full border-2 border-black transition-colors ${newsLang === 'en' ? 'bg-blue-600' : 'bg-surface-container-highest'}`}
-                    >
-                      <span className={`absolute top-0.5 h-4 w-4 rounded-full border border-black bg-white transition-transform ${newsLang === 'en' ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                    </button>
-                    <span className={`font-label-caps text-[11px] ${newsLang === 'en' ? 'text-blue-400 font-bold' : 'text-on-surface-variant'}`}>ENG</span>
+                  <div className="flex items-center gap-2 rounded-xl border-[2px] border-black bg-surface-container-high px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+                    <span className="font-label-caps text-[11px] text-on-surface-variant">LINGUA</span>
+                    <div className="flex items-center gap-1 rounded-lg border-2 border-black bg-black p-1">
+                      <button
+                        type="button"
+                        onClick={() => setNewsLang('it')}
+                        className={`rounded px-2 py-1 font-label-caps text-[10px] transition-all ${newsLang === 'it' ? 'bg-tertiary text-black' : 'text-white hover:bg-white/10'}`}
+                      >
+                        IT
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewsLang('en')}
+                        className={`rounded px-2 py-1 font-label-caps text-[10px] transition-all ${newsLang === 'en' ? 'bg-tertiary text-black' : 'text-white hover:bg-white/10'}`}
+                      >
+                        EN
+                      </button>
+                    </div>
                   </div>
                   <button
                     type="button"

@@ -34,6 +34,7 @@ import SavedProjects from './pages/SavedProjects'
 import CreatorProfile from './pages/CreatorProfile'
 import IdeaSubmit from './pages/IdeaSubmit'
 import MyIdeas from './pages/MyIdeas'
+import WorkingOn from './pages/WorkingOn'
 
 function App() {
   return (
@@ -55,7 +56,8 @@ function App() {
 
                   {/* Protected routes — require login + accepted terms */}
                   <Route path="/" element={<Home />} />
-                  <Route path="/tierlist" element={<RequireAuth><RequireAdmin><TierList /></RequireAdmin></RequireAuth>} />
+                  <Route path="/tierlist" element={<WorkingOn />} />
+                  <Route path="/new-tierlist" element={<RequireAuth><RequireAdmin><TierList></TierList></RequireAdmin></RequireAuth>} />
                   <Route path="/social" element={<Social />} />
                   <Route path="/progetti" element={<Projects />} />
                   <Route path="/wiki" element={<Wiki />} />

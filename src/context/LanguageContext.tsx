@@ -467,6 +467,8 @@ const translations = {
     'common.less': 'Di meno',
     'common.show': 'Mostra',
     'common.hide': 'Nascondi',
+    'common.workingon': 'Stiamo lavorando a questa pagina!',
+    'common.gohome': 'VAI ALLA HOME',
 
     // Admin Panel
     'admin.title': 'Pannello Admin',
@@ -1010,6 +1012,8 @@ const translations = {
     'common.less': 'Less',
     'common.show': 'Show',
     'common.hide': 'Hide',
+    'common.workingon': 'Seems like we\'re working here...',
+    'common.gohome': 'GO TO THE HOME PAGE',
 
     // Admin Panel
     'admin.title': 'Admin Panel',

@@ -25,7 +25,7 @@ const TIER_ORDER: Record<string, number> = {
   'UNRANKED': 99
 };
 
-const CATEGORIES = ['OVERALL', 'LTMS', 'VANILLA', 'UHC', 'POT', 'NETHOP', 'SMP', 'SWORD', 'AXE', 'MACE', 'CRYSTAL'];
+const CATEGORIES = ['OVERALL', 'SWORD', 'AXE', 'MACE', 'SPEAR MACE', 'SMP', 'DIA SMP', 'CART PVP', 'VANILLA', 'NETHOP'];
 
 const getTierTone = (tier?: string) => {
   if (!tier || tier === 'UNRANKED') return 'border-outline bg-surface-container text-on-surface-variant';

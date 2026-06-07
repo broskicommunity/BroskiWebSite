@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../config/supabaseClient';
 import PageAnimator from '../components/PageAnimator';
@@ -145,6 +146,7 @@ interface Idea {
 const AdminPanel: React.FC = () => {
   const { profile } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<AdminTab>('news');
   
   // Countdown state
@@ -798,6 +800,14 @@ const AdminPanel: React.FC = () => {
           <div className="rounded-[2rem] border-[4px] border-black bg-surface-container p-6 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="font-headline-md text-[28px] text-white">{t('admin.tierlist.title')}</h2>
+              <button 
+                className="rounded-xl border-[3px] border-black bg-tertiary px-4 py-2 font-label-caps text-[12px] text-gray-700 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5 active:translate-x-1 active:translate-y-1 active:shadow-none"
+                onClick={() => {
+                  navigate('/newtierlist');
+                }}
+              >
+                NEW TIERLIST
+              </button>
               <button
                 onClick={() => {
                   setEditingPlayer(null);
@@ -810,7 +820,7 @@ const AdminPanel: React.FC = () => {
                 }}
                 className="rounded-xl border-[3px] border-black bg-tertiary px-4 py-2 font-label-caps text-[12px] text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5 active:translate-x-1 active:translate-y-1 active:shadow-none"
               >
-                <span className="material-symbols-outlined mr-1 inline-block text-[18px]">add</span>
+                <span className="material-symbols-outlined mr-1 inline-block align-middle text-[18px]">add</span>
                 {t('admin.tierlist.new')}
               </button>
             </div>

@@ -9,6 +9,7 @@ interface FeatureItem {
   description: string;
   image?: string;
   banner_url?: string | null;
+  custom_gradient?: string | null;
   icon?: string;
   variant: 'primary' | 'blue' | 'secondary';
   colSpan: string;
@@ -21,6 +22,7 @@ interface NewsItem {
   title_en: string | null;
   content_en: string | null;
   banner_url: string | null;
+  custom_gradient: string | null;
   category: string;
   variant: 'default' | 'urgent' | 'event';
   icon: string;
@@ -180,6 +182,7 @@ const Features: React.FC = () => {
         description: (language === 'en' && item.content_en) ? item.content_en : item.content,
         icon: item.icon,
         banner_url: item.banner_url,
+        custom_gradient: item.custom_gradient,
         variant: item.variant === 'urgent' ? 'blue' : item.variant === 'event' ? 'secondary' : 'primary',
         colSpan: 'md:col-span-6',
       }))
@@ -220,6 +223,24 @@ const Features: React.FC = () => {
       diff += total;
     }
     return diff;
+  };
+
+  // Helper per generare lo stile background dalla custom_gradient o dal variant di default
+  const getCardBackground = (item: FeatureItem): React.CSSProperties => {
+    if (item.custom_gradient) {
+      const colors = item.custom_gradient.split(',').map(c => c.trim());
+      if (colors.length === 1) {
+        return { background: colors[0] };
+      }
+      return { background: `linear-gradient(135deg, ${colors.join(', ')})` };
+    }
+    // Default gradients per variante
+    const defaults: Record<string, string> = {
+      primary: 'linear-gradient(150deg, #1a2332 0%, #1e3a2e 40%, #065f46 100%)',
+      blue: 'linear-gradient(160deg, #1e3a5f 0%, #2563eb 40%, #3b82f6 100%)',
+      secondary: 'linear-gradient(145deg, #2d1b4e 0%, #4a1d6b 40%, #7c3aed 100%)',
+    };
+    return { background: defaults[item.variant] || defaults.primary };
   };
 
   return (
@@ -285,11 +306,11 @@ const Features: React.FC = () => {
                 className={`absolute h-[500px] w-[310px] transition-all duration-500 ease-in-out sm:h-[590px] sm:w-[420px] ${transformClass}`}
               >
                 {item.variant === 'primary' && item.image ? (
-                  <div className="group relative flex h-full w-full flex-col overflow-hidden rounded-[2.5rem] border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-transform duration-300 hover:scale-[1.03]" style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)' }}>
+                  <div className="group relative flex h-full w-full flex-col overflow-hidden rounded-[2.5rem] border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-transform duration-300 hover:scale-[1.03]" style={getCardBackground(item)}>
                     <div className={`absolute inset-0 bg-black z-10 transition-opacity duration-500 pointer-events-none ${overlayClass}`} />
                     <div className="relative h-64 shrink-0 overflow-hidden border-b-[4px] border-black">
                       <img className="w-full h-full object-cover opacity-60 mix-blend-luminosity group-hover:scale-105 transition-transform duration-500" alt={item.title} src={item.image} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a2e] via-transparent to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                       <div className="absolute left-4 top-4 rounded-2xl border-[2px] border-black bg-surface px-3 py-2 font-label-caps text-label-caps text-primary shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
                         {item.number}
                       </div>
@@ -302,12 +323,12 @@ const Features: React.FC = () => {
                     </div>
                   </div>
                 ) : item.variant === 'blue' ? (
-                  <div className="group relative flex h-full w-full flex-col justify-between overflow-hidden rounded-[2.5rem] border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-transform duration-300 hover:scale-[1.03]" style={{ background: 'linear-gradient(160deg, #1e3a5f 0%, #2563eb 40%, #3b82f6 100%)' }}>
+                  <div className="group relative flex h-full w-full flex-col justify-between overflow-hidden rounded-[2.5rem] border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-transform duration-300 hover:scale-[1.03]" style={getCardBackground(item)}>
                     <div className={`absolute inset-0 bg-black z-10 transition-opacity duration-500 pointer-events-none ${overlayClass}`} />
                     {item.banner_url && (
                       <>
                         <img src={item.banner_url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30 mix-blend-overlay" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#1e3a5f] via-[#1e3a5f]/60 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                       </>
                     )}
                     <div className="relative flex h-full flex-col gap-stack-sm overflow-y-auto p-6">
@@ -326,12 +347,12 @@ const Features: React.FC = () => {
                     </div>
                   </div>
                 ) : item.variant === 'secondary' ? (
-                  <div className="group relative flex h-full w-full flex-col justify-between overflow-hidden rounded-[2.5rem] border-[4px] border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-transform duration-300 hover:scale-[1.03]" style={{ background: 'linear-gradient(145deg, #2d1b4e 0%, #4a1d6b 40%, #7c3aed 100%)' }}>
+                  <div className="group relative flex h-full w-full flex-col justify-between overflow-hidden rounded-[2.5rem] border-[4px] border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-transform duration-300 hover:scale-[1.03]" style={getCardBackground(item)}>
                     <div className={`absolute inset-0 bg-black z-10 transition-opacity duration-500 pointer-events-none ${overlayClass}`} />
                     {item.banner_url && (
                       <>
                         <img src={item.banner_url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25 mix-blend-overlay" />
-                        <div className="absolute inset-0 bg-gradient-to-b from-[#2d1b4e]/80 via-transparent to-[#2d1b4e]" />
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80" />
                       </>
                     )}
                     <div className="relative flex flex-col gap-stack-sm">
@@ -352,23 +373,23 @@ const Features: React.FC = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="group relative flex h-full w-full flex-col overflow-hidden rounded-[2.5rem] border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-transform duration-300 hover:scale-[1.03]" style={{ background: 'linear-gradient(150deg, #1a2332 0%, #1e3a2e 40%, #065f46 100%)' }}>
+                  <div className="group relative flex h-full w-full flex-col overflow-hidden rounded-[2.5rem] border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-transform duration-300 hover:scale-[1.03]" style={getCardBackground(item)}>
                     <div className={`absolute inset-0 bg-black z-10 transition-opacity duration-500 pointer-events-none ${overlayClass}`} />
                     {item.banner_url && (
                       <>
                         <img src={item.banner_url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25 mix-blend-overlay" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#1a2332] via-[#1a2332]/60 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                       </>
                     )}
                     <div className="relative flex h-full flex-col gap-stack-sm overflow-y-auto p-6">
                       <div className="mb-4 flex shrink-0 items-start justify-between">
-                        <span className="material-symbols-outlined rounded-3xl border-[3px] border-black bg-emerald-600/50 p-3 text-[48px] text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">{item.icon}</span>
+                        <span className="material-symbols-outlined rounded-3xl border-[3px] border-black bg-white/10 p-3 text-[48px] text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">{item.icon}</span>
                         <div className="rounded-2xl border-[2px] border-black bg-surface px-3 py-2 font-label-caps text-label-caps text-emerald-400 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
                           {item.number}
                         </div>
                       </div>
-                      <h3 className="shrink-0 font-headline-md text-[28px] leading-tight text-emerald-200">{item.title}</h3>
-                      <p className="shrink-0 rounded-3xl border-2 border-white/10 bg-black/20 p-4 font-body-sm text-body-sm text-emerald-100/80">
+                      <h3 className="shrink-0 font-headline-md text-[28px] leading-tight text-white">{item.title}</h3>
+                      <p className="shrink-0 rounded-3xl border-2 border-white/10 bg-black/20 p-4 font-body-sm text-body-sm text-white/80">
                         {item.description}
                       </p>
                     </div>

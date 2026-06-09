@@ -13,6 +13,7 @@ interface NewsItem {
   title_en: string | null;
   content_en: string | null;
   banner_url: string | null;
+  custom_gradient: string | null;
   category: string;
   variant: 'default' | 'urgent' | 'event';
   icon: string;
@@ -182,6 +183,7 @@ const AdminPanel: React.FC = () => {
     title_en: '',
     content_en: '',
     banner_url: '',
+    custom_gradient: '',
     category: 'GENERALE',
     variant: 'default' as 'default' | 'urgent' | 'event',
     icon: 'newspaper',
@@ -319,6 +321,7 @@ const AdminPanel: React.FC = () => {
       title_en: newsForm.title_en || null,
       content_en: newsForm.content_en || null,
       banner_url: newsForm.banner_url || null,
+      custom_gradient: newsForm.custom_gradient || null,
       category: newsForm.category,
       variant: newsForm.variant,
       icon: newsForm.icon,
@@ -339,6 +342,7 @@ const AdminPanel: React.FC = () => {
       title_en: '',
       content_en: '',
       banner_url: '',
+      custom_gradient: '',
       category: 'GENERALE',
       variant: 'default',
       icon: 'newspaper',
@@ -363,6 +367,7 @@ const AdminPanel: React.FC = () => {
       title_en: item.title_en || '',
       content_en: item.content_en || '',
       banner_url: item.banner_url || '',
+      custom_gradient: item.custom_gradient || '',
       category: item.category,
       variant: item.variant,
       icon: item.icon,
@@ -609,6 +614,7 @@ const AdminPanel: React.FC = () => {
                     title_en: '',
                     content_en: '',
                     banner_url: '',
+                    custom_gradient: '',
                     category: 'GENERALE',
                     variant: 'default',
                     icon: 'newspaper',
@@ -683,10 +689,37 @@ const AdminPanel: React.FC = () => {
                       onChange={(e) => setNewsForm({ ...newsForm, variant: e.target.value as 'default' | 'urgent' | 'event' })}
                       className="w-full rounded-xl border-[3px] border-black bg-surface-container px-3 py-2 text-sm text-on-surface shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
                     >
-                      <option value="default">Default</option>
+                      <option value="default">Default (Verde)</option>
                       <option value="urgent">Urgente (Blu)</option>
-                      <option value="event">Evento (Secondario)</option>
+                      <option value="event">Evento (Viola)</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block font-label-caps text-[11px] text-on-surface-variant">
+                      Colore Custom <span className="text-on-surface-variant/50">(sovrascrive variante)</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newsForm.custom_gradient}
+                        onChange={(e) => setNewsForm({ ...newsForm, custom_gradient: e.target.value })}
+                        placeholder="#1e3a5f,#2563eb,#3b82f6"
+                        className="w-full rounded-xl border-[3px] border-black bg-surface-container px-3 py-2 text-sm text-on-surface shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
+                      />
+                    </div>
+                    <p className="mt-1 text-[10px] text-on-surface-variant/60">
+                      1 hex = colore piatto • 2-3 hex separati da virgola = gradiente
+                    </p>
+                    {newsForm.custom_gradient && (
+                      <div
+                        className="mt-2 h-6 w-full rounded-lg border-2 border-black"
+                        style={{
+                          background: newsForm.custom_gradient.includes(',')
+                            ? `linear-gradient(135deg, ${newsForm.custom_gradient.split(',').map(c => c.trim()).join(', ')})`
+                            : newsForm.custom_gradient.trim()
+                        }}
+                      />
+                    )}
                   </div>
                   <div className="sm:col-span-2">
                     <label className="mb-1 block font-label-caps text-[11px] text-on-surface-variant">

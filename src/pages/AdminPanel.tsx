@@ -1430,6 +1430,18 @@ const AdminPanel: React.FC = () => {
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-headline-md text-[14px] text-white">{u.minecraft_username || 'N/A'}</span>
+                              <button
+                                onClick={async () => {
+                                  const newMc = prompt('Nuovo Minecraft Username:', u.minecraft_username || '');
+                                  if (newMc === null) return;
+                                  await supabase.from('profiles').update({ minecraft_username: newMc || null }).eq('id', u.id);
+                                  fetchUsers();
+                                }}
+                                className="rounded p-0.5 text-on-surface-variant hover:bg-white/10"
+                                title="Modifica MC username"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">edit</span>
+                              </button>
                               {!u.ign_verified && (
                                 <span className="rounded border border-yellow-500 bg-yellow-500/20 px-1.5 py-0.5 font-label-caps text-[8px] text-yellow-400">NON VERIFICATO</span>
                               )}
@@ -1442,7 +1454,22 @@ const AdminPanel: React.FC = () => {
                                 }`}>{u.admin_rank.toUpperCase()}</span>
                               )}
                             </div>
-                            <span className="text-xs text-on-surface-variant">{u.email}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-on-surface-variant">{u.email}</span>
+                              {u.gd_username && <span className="text-xs text-on-surface-variant">• GD: {u.gd_username}</span>}
+                              <button
+                                onClick={async () => {
+                                  const newGd = prompt('Nuovo Geometry Dash Username:', u.gd_username || '');
+                                  if (newGd === null) return;
+                                  await supabase.from('profiles').update({ gd_username: newGd || null }).eq('id', u.id);
+                                  fetchUsers();
+                                }}
+                                className="rounded p-0.5 text-on-surface-variant hover:bg-white/10"
+                                title="Modifica GD username"
+                              >
+                                <span className="material-symbols-outlined text-[12px]">edit</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">

@@ -95,8 +95,15 @@ const IdolCard: React.FC<{ data: IdolData }> = ({ data }) => {
           if (data.fallbackVideoUrl) {
             const videoId = extractVideoId(data.fallbackVideoUrl);
             if (videoId) {
+              // Prova noembed per il titolo (non richiede API key)
+              let title = data.name;
+              try {
+                const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+                const json = await res.json();
+                if (json.title) title = json.title;
+              } catch { /* usa nome di default */ }
               setVideo({
-                title: data.name,
+                title,
                 link: data.fallbackVideoUrl,
                 thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
               });
@@ -125,12 +132,24 @@ const IdolCard: React.FC<{ data: IdolData }> = ({ data }) => {
           }
         }
 
-        // Ultimo fallback: usa fallbackVideoUrl con thumbnail generata
+        // Ultimo fallback: usa fallbackVideoUrl con thumbnail generata e titolo da API
         if (data.fallbackVideoUrl) {
           const videoId = extractVideoId(data.fallbackVideoUrl);
           if (videoId) {
+            // Prova a ottenere il titolo dalla YouTube API
+            const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+            let title = data.name;
+            if (apiKey) {
+              try {
+                const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`);
+                const json = await res.json();
+                if (json.items && json.items.length > 0) {
+                  title = json.items[0].snippet.title;
+                }
+              } catch { /* usa nome di default */ }
+            }
             setVideo({
-              title: data.name,
+              title,
               link: data.fallbackVideoUrl,
               thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
             });

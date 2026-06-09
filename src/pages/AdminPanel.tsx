@@ -131,7 +131,7 @@ const calculatePoints = (ranks: Record<string, string>): number => {
   return total;
 };
 
-type AdminTab = 'news' | 'tierlist' | 'countdown' | 'contacts' | 'mods' | 'ideas';
+type AdminTab = 'news' | 'tierlist' | 'countdown' | 'contacts' | 'mods' | 'ideas' | 'users';
 
 interface Idea {
   id: string;
@@ -170,6 +170,11 @@ const AdminPanel: React.FC = () => {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [ideasLoading, setIdeasLoading] = useState(false);
   const [ideaDropdownOpen, setIdeaDropdownOpen] = useState<string | null>(null);
+
+  // Users state (only for owners)
+  const [allUsers, setAllUsers] = useState<{id: string; minecraft_username: string | null; gd_username: string | null; email: string; role: string; admin_rank: string | null; ign_verified: boolean; created_at: string}[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
   
   // News state
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -257,11 +262,23 @@ const AdminPanel: React.FC = () => {
     setIdeasLoading(false);
   }, []);
 
+  const fetchUsers = useCallback(async () => {
+    if (profile?.admin_rank !== 'owner') return;
+    setUsersLoading(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, minecraft_username, gd_username, email, role, admin_rank, ign_verified, created_at')
+      .order('created_at', { ascending: false });
+    if (!error && data) setAllUsers(data);
+    setUsersLoading(false);
+  }, [profile?.admin_rank]);
+
   useEffect(() => {
     fetchNews();
     fetchPlayers();
     fetchPendingMods();
     fetchIdeas();
+    fetchUsers();
     // Fetch countdown target
     (async () => {
       const { data } = await supabase
@@ -287,7 +304,7 @@ const AdminPanel: React.FC = () => {
         });
       }
     })();
-  }, [fetchNews, fetchPlayers, fetchPendingMods, fetchIdeas]);
+  }, [fetchNews, fetchPlayers, fetchPendingMods, fetchIdeas, fetchUsers]);
 
   const handleSaveCountdown = async () => {
     setCountdownSaving(true);
@@ -597,6 +614,19 @@ const AdminPanel: React.FC = () => {
             <span className="material-symbols-outlined mr-2 inline-block">lightbulb</span>
             IDEE
           </button>
+          {profile?.admin_rank === 'owner' && (
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`rounded-2xl border-[3px] border-black px-6 py-3 font-headline-md text-[16px] shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] transition-all ${
+                activeTab === 'users'
+                  ? 'bg-primary-container text-white'
+                  : 'bg-surface-container text-on-surface hover:-translate-y-1'
+              }`}
+            >
+              <span className="material-symbols-outlined mr-2 inline-block">group</span>
+              UTENTI
+            </button>
+          )}
         </div>
 
         {/* NEWS TAB */}
@@ -1299,6 +1329,112 @@ const AdminPanel: React.FC = () => {
                           </div>
                         )}
                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {/* USERS TAB - Owner only */}
+        {activeTab === 'users' && profile?.admin_rank === 'owner' && (
+          <div className="rounded-[2rem] border-[4px] border-black bg-surface-container p-6 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="font-headline-md text-[28px] text-white">Gestione Utenti</h2>
+              <span className="font-label-caps text-[11px] text-on-surface-variant">{allUsers.length} utenti totali</span>
+            </div>
+            
+            {/* Search */}
+            <div className="mb-4">
+              <input
+                type="text"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                placeholder="Cerca per username o email..."
+                className="w-full rounded-xl border-[3px] border-black bg-surface-container-high px-4 py-2 text-sm text-on-surface shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
+              />
+            </div>
+
+            {usersLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-container border-t-transparent" />
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                {allUsers
+                  .filter(u => {
+                    const q = userSearch.toLowerCase();
+                    return !q || (u.minecraft_username?.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+                  })
+                  .map((u) => (
+                  <div key={u.id} className="flex flex-col gap-3 rounded-xl border-[3px] border-black bg-surface-container-high p-4 shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={u.ign_verified ? `https://mc-heads.net/avatar/${u.minecraft_username}/48` : '/profilepng/bde5a0ac04e56a64.png'}
+                        alt=""
+                        className="h-10 w-10 rounded-xl border-2 border-black"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-headline-md text-[14px] text-white">{u.minecraft_username || 'N/A'}</span>
+                          {!u.ign_verified && (
+                            <span className="rounded border border-yellow-500 bg-yellow-500/20 px-1.5 py-0.5 font-label-caps text-[8px] text-yellow-400">NON VERIFICATO</span>
+                          )}
+                          {u.admin_rank && (
+                            <span className={`rounded border-2 border-black px-1.5 py-0.5 font-label-caps text-[8px] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
+                              u.admin_rank === 'owner' ? 'bg-tertiary text-black' :
+                              u.admin_rank === 'admin' ? 'bg-primary-container text-white' :
+                              u.admin_rank === 'mod' ? 'bg-blue-600 text-white' :
+                              'bg-green-600 text-white'
+                            }`}>{u.admin_rank.toUpperCase()}</span>
+                          )}
+                        </div>
+                        <span className="text-xs text-on-surface-variant">{u.email}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!u.ign_verified && (
+                        <button
+                          onClick={async () => {
+                            await supabase.from('profiles').update({ ign_verified: true }).eq('id', u.id);
+                            fetchUsers();
+                          }}
+                          className="rounded-lg border-2 border-black bg-green-600 px-3 py-1.5 font-label-caps text-[10px] text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5"
+                        >
+                          ✓ APPROVA IGN
+                        </button>
+                      )}
+                      <select
+                        value={u.admin_rank || 'user'}
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          if (val === 'user') {
+                            await supabase.from('profiles').update({ role: 'user', admin_rank: null }).eq('id', u.id);
+                          } else {
+                            await supabase.from('profiles').update({ role: 'admin', admin_rank: val }).eq('id', u.id);
+                          }
+                          fetchUsers();
+                        }}
+                        className="rounded-lg border-2 border-black bg-surface-container px-2 py-1.5 font-label-caps text-[10px] text-on-surface shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                      >
+                        <option value="user">User</option>
+                        <option value="tier_tester">Tier Tester</option>
+                        <option value="mod">Mod</option>
+                        <option value="admin">Admin</option>
+                        <option value="owner">Owner</option>
+                      </select>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Eliminare l'utente ${u.minecraft_username || u.email}? Questa azione è irreversibile.`)) return;
+                          await supabase.from('profiles').delete().eq('id', u.id);
+                          await supabase.from('mod_messages').delete().eq('author_id', u.id);
+                          // Nota: eliminare da auth.users richiede service role, non possibile da client
+                          fetchUsers();
+                        }}
+                        className="rounded-lg border-2 border-black bg-error-container p-1.5 text-on-error-container shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
                     </div>
                   </div>
                 ))}

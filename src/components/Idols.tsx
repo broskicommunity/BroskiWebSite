@@ -16,6 +16,7 @@ interface IdolData {
   btnTextColorClass: string;
   description: string;
   defaultImage: string;
+  fallbackVideoUrl?: string;
 }
 
 const idolsData: IdolData[] = [
@@ -47,7 +48,8 @@ const idolsData: IdolData[] = [
     textColorClass: 'text-error',
     btnTextColorClass: 'text-on-error',
     description: "E' uno dei più skillati del gruppo. E' determinato, saggio e in grado di fare qualunque cosa se vuole.",
-    defaultImage: 'https://placehold.co/600x350/FF1F44/FFFFFF?text=Muffin'
+    defaultImage: 'https://placehold.co/600x350/FF1F44/FFFFFF?text=Muffin',
+    fallbackVideoUrl: 'https://www.youtube.com/@il_Muffin/videos'
   }
 ];
 
@@ -80,44 +82,28 @@ const IdolCard: React.FC<{ data: IdolData }> = ({ data }) => {
           }
         }
 
-        // Fallback: YouTube Data API v3 (filtra solo video lunghi)
+        // Fallback: YouTube Data API v3 con filtro videoDuration
         const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
         if (!apiKey) return;
 
-        // Step 1: cerca i video del canale
-        const searchRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=id&channelId=${data.channelId}&order=date&type=video&maxResults=10&key=${apiKey}`
-        );
-        const searchData = await searchRes.json();
-        if (!searchData.items || searchData.items.length === 0) return;
+        // Cerca video con durata "medium" (4-20 min) o "long" (20+ min)
+        for (const duration of ['medium', 'long'] as const) {
+          const searchRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${data.channelId}&order=date&type=video&videoDuration=${duration}&maxResults=1&key=${apiKey}`
+          );
+          const searchData = await searchRes.json();
 
-        const videoIds = searchData.items.map((item: any) => item.id.videoId).join(',');
-
-        // Step 2: ottieni i dettagli (durata) per filtrare shorts
-        const detailsRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet&id=${videoIds}&key=${apiKey}`
-        );
-        const detailsData = await detailsRes.json();
-        if (!detailsData.items) return;
-
-        // Filtra video con durata > 60 secondi (non shorts)
-        const longVideo = detailsData.items.find((item: any) => {
-          const duration = item.contentDetails.duration; // formato ISO 8601: PT1M30S, PT15M, etc.
-          const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-          if (!match) return false;
-          const hours = parseInt(match[1] || '0');
-          const minutes = parseInt(match[2] || '0');
-          const seconds = parseInt(match[3] || '0');
-          const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-          return totalSeconds > 60;
-        });
-
-        if (longVideo) {
-          setVideo({
-            title: longVideo.snippet.title,
-            link: `https://www.youtube.com/watch?v=${longVideo.id}`,
-            thumbnail: longVideo.snippet.thumbnails?.maxres?.url || longVideo.snippet.thumbnails?.high?.url || longVideo.snippet.thumbnails?.medium?.url
-          });
+          if (searchData.items && searchData.items.length > 0) {
+            const item = searchData.items[0];
+            const videoId = item.id.videoId;
+            const thumbnail = item.snippet.thumbnails?.maxres?.url || item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url;
+            setVideo({
+              title: item.snippet.title,
+              link: `https://www.youtube.com/watch?v=${videoId}`,
+              thumbnail: thumbnail
+            });
+            return;
+          }
         }
       } catch (error) {
         console.error(`Error loading video for ${data.name}:`, error);
@@ -168,7 +154,7 @@ const IdolCard: React.FC<{ data: IdolData }> = ({ data }) => {
         </p>
       )}
       <a 
-        href={video?.link || data.channelLink}
+        href={video?.link || data.fallbackVideoUrl || data.channelLink}
         target="_blank"
         rel="noopener noreferrer"
         className={`relative z-10 mt-auto block w-full rounded-2xl border-[3px] border-black px-4 py-3 text-center font-label-caps text-label-caps shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 active:translate-x-1 active:translate-y-1 active:shadow-none ${data.colorClass} ${data.btnTextColorClass}`}

@@ -1466,16 +1466,38 @@ const AdminPanel: React.FC = () => {
                           </select>
                           <button
                             onClick={async () => {
-                              if (!confirm(`Eliminare l'utente ${u.minecraft_username || u.email}? Il profilo verrà rimosso.`)) return;
-                              // Elimina prima le referenze
-                              await supabase.from('mod_messages').delete().eq('author_id', u.id);
-                              await supabase.from('ideas').delete().eq('author_id', u.id);
-                              // Poi elimina il profilo
-                              const { error: delError } = await supabase.from('profiles').delete().eq('id', u.id);
-                              if (delError) {
-                                alert(`Errore: ${delError.message}`);
-                              } else {
+                              if (!confirm(`Eliminare l'utente ${u.minecraft_username || u.email}? I dati verranno rimossi permanentemente.`)) return;
+                              try {
+                                // Elimina tutte le referenze dell'utente
+                                await supabase.from('mod_messages').delete().eq('author_id', u.id);
+                                await supabase.from('user_follows').delete().eq('follower_id', u.id);
+                                await supabase.from('user_follows').delete().eq('creator_id', u.id);
+                                await supabase.from('user_saves').delete().eq('user_id', u.id);
+                                await supabase.from('ideas').delete().eq('author_id', u.id);
+                                // Elimina le mod dell'utente (prima versioni e messaggi collegati)
+                                const { data: userMods } = await supabase.from('mods').select('id').eq('author_id', u.id);
+                                if (userMods) {
+                                  for (const mod of userMods) {
+                                    await supabase.from('mod_versions').delete().eq('mod_id', mod.id);
+                                    await supabase.from('mod_messages').delete().eq('mod_id', mod.id);
+                                    await supabase.from('user_saves').delete().eq('mod_id', mod.id);
+                                  }
+                                  await supabase.from('mods').delete().eq('author_id', u.id);
+                                }
+                                // Soft-delete del profilo (non possiamo eliminare da auth.users dal client)
+                                await supabase.from('profiles').update({
+                                  minecraft_username: null,
+                                  gd_username: null,
+                                  display_name: '[ELIMINATO]',
+                                  email: `deleted_${u.id}@removed.local`,
+                                  role: 'user',
+                                  admin_rank: null,
+                                  bio: null,
+                                  ign_verified: false,
+                                }).eq('id', u.id);
                                 fetchUsers();
+                              } catch (err) {
+                                alert(`Errore durante l'eliminazione: ${err instanceof Error ? err.message : 'sconosciuto'}`);
                               }
                             }}
                             className="rounded-lg border-2 border-black bg-error-container p-1.5 text-on-error-container shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5"

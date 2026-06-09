@@ -9,6 +9,8 @@ export interface Profile {
   display_name: string | null;
   email: string;
   role: 'user' | 'admin';
+  admin_rank: 'owner' | 'admin' | 'mod' | 'tier_tester' | null;
+  ign_verified: boolean;
   accepted_terms: boolean;
   accepted_terms_at: string | null;
   created_at: string;

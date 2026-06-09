@@ -16,6 +16,7 @@ interface IdolData {
   btnTextColorClass: string;
   description: string;
   defaultImage: string;
+  fallbackVideoUrl?: string;
 }
 
 const idolsData: IdolData[] = [
@@ -47,9 +48,16 @@ const idolsData: IdolData[] = [
     textColorClass: 'text-error',
     btnTextColorClass: 'text-on-error',
     description: "E' uno dei più skillati del gruppo. E' determinato, saggio e in grado di fare qualunque cosa se vuole.",
-    defaultImage: 'https://placehold.co/600x350/FF1F44/FFFFFF?text=Muffin'
+    defaultImage: 'https://placehold.co/600x350/FF1F44/FFFFFF?text=Muffin',
+    fallbackVideoUrl: 'https://www.youtube.com/watch?v=BBUWO2U8jrA'
   }
 ];
+
+// Estrae l'ID video da un URL YouTube
+const extractVideoId = (url: string): string | null => {
+  const match = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+};
 
 const IdolCard: React.FC<{ data: IdolData }> = ({ data }) => {
   const { t } = useLanguage();
@@ -58,25 +66,92 @@ const IdolCard: React.FC<{ data: IdolData }> = ({ data }) => {
   useEffect(() => {
     const fetchLatestVideo = async () => {
       try {
+        // Primo tentativo: RSS feed
         const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=https://www.youtube.com/feeds/videos.xml?channel_id=${data.channelId}`);
         const result = await response.json();
         
         if (result.status === 'ok' && result.items && result.items.length > 0) {
-          // Prima prova a filtrare shorts/live, se non trova nulla usa il primo video disponibile
           const longVideos = result.items.filter((item: any) => {
             const isShort = item.link.includes('/shorts/');
             return !isShort;
           });
           
-          const videoToUse = longVideos.length > 0 ? longVideos[0] : result.items[0];
-          
-          if (videoToUse) {
-            // Prova maxresdefault, con fallback a hqdefault
-            const maxRes = videoToUse.thumbnail?.replace('hqdefault.jpg', 'maxresdefault.jpg') || videoToUse.thumbnail;
+          if (longVideos.length > 0) {
+            const latestVideo = longVideos[0];
+            const maxRes = latestVideo.thumbnail?.replace('hqdefault.jpg', 'maxresdefault.jpg') || latestVideo.thumbnail;
             setVideo({
-              title: videoToUse.title,
-              link: videoToUse.link,
+              title: latestVideo.title,
+              link: latestVideo.link,
               thumbnail: maxRes
+            });
+            return; // Trovato, finito
+          }
+        }
+
+        // Fallback: YouTube Data API v3 con filtro videoDuration
+        const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+        if (!apiKey) {
+          // Se non c'è API key, usa il fallbackVideoUrl direttamente
+          if (data.fallbackVideoUrl) {
+            const videoId = extractVideoId(data.fallbackVideoUrl);
+            if (videoId) {
+              // Prova noembed per il titolo (non richiede API key)
+              let title = data.name;
+              try {
+                const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+                const json = await res.json();
+                if (json.title) title = json.title;
+              } catch { /* usa nome di default */ }
+              setVideo({
+                title,
+                link: data.fallbackVideoUrl,
+                thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+              });
+            }
+          }
+          return;
+        }
+
+        // Cerca video con durata "medium" (4-20 min) o "long" (20+ min)
+        for (const duration of ['medium', 'long'] as const) {
+          const searchRes = await fetch(
+            `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${data.channelId}&order=date&type=video&videoDuration=${duration}&maxResults=1&key=${apiKey}`
+          );
+          const searchData = await searchRes.json();
+
+          if (searchData.items && searchData.items.length > 0) {
+            const item = searchData.items[0];
+            const videoId = item.id.videoId;
+            const thumbnail = item.snippet.thumbnails?.maxres?.url || item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url;
+            setVideo({
+              title: item.snippet.title,
+              link: `https://www.youtube.com/watch?v=${videoId}`,
+              thumbnail: thumbnail
+            });
+            return;
+          }
+        }
+
+        // Ultimo fallback: usa fallbackVideoUrl con thumbnail generata e titolo da API
+        if (data.fallbackVideoUrl) {
+          const videoId = extractVideoId(data.fallbackVideoUrl);
+          if (videoId) {
+            // Prova a ottenere il titolo dalla YouTube API
+            const apiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+            let title = data.name;
+            if (apiKey) {
+              try {
+                const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`);
+                const json = await res.json();
+                if (json.items && json.items.length > 0) {
+                  title = json.items[0].snippet.title;
+                }
+              } catch { /* usa nome di default */ }
+            }
+            setVideo({
+              title,
+              link: data.fallbackVideoUrl,
+              thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
             });
           }
         }
@@ -129,7 +204,7 @@ const IdolCard: React.FC<{ data: IdolData }> = ({ data }) => {
         </p>
       )}
       <a 
-        href={video?.link || data.channelLink}
+        href={video?.link || data.fallbackVideoUrl || data.channelLink}
         target="_blank"
         rel="noopener noreferrer"
         className={`relative z-10 mt-auto block w-full rounded-2xl border-[3px] border-black px-4 py-3 text-center font-label-caps text-label-caps shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 active:translate-x-1 active:translate-y-1 active:shadow-none ${data.colorClass} ${data.btnTextColorClass}`}

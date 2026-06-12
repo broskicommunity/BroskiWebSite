@@ -15,7 +15,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
   const [timeLeft, setTimeLeft] = useState(roomState.settings.turnTime);
   const [usedWords, setUsedWords] = useState<Set<string>>(new Set());
-  const [dictReady, setDictReady] = useState(isDictionaryLoaded());
+  const [, setDictReady] = useState(isDictionaryLoaded());
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -28,7 +28,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
 
   const currentPlayer = roomState.players[roomState.currentTurnIndex];
   const isMyTurn = currentPlayer?.nickname === nickname;
-  const _myPlayer = roomState.players.find(p => p.nickname === nickname);
+
   const alivePlayers = roomState.players.filter(p => p.lives > 0);
 
   // Check for winner

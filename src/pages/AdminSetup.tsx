@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../config/supabaseClient';
 import PageAnimator from '../components/PageAnimator';
 
 // Admin promotion è gestita esclusivamente dal database/pannello admin.
@@ -13,7 +12,7 @@ const AdminSetup: React.FC = () => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
 
   // Se non loggato, mostra messaggio
   if (!user || !profile) {

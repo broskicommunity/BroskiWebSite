@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import DOMPurify from 'dompurify';
 import { supabase } from '../config/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import PageAnimator from './PageAnimator';
@@ -16,14 +15,6 @@ const extractSpotifySrc = (input: string): string | null => {
   if (srcMatch) return srcMatch[1];
   return null;
 };
-
-// Sanitizza CSS custom per prevenire exfiltration
-const sanitizeCSS = (css: string): string =>
-  css
-    .replace(/url\s*\([^)]*\)/gi, '')
-    .replace(/expression\s*\([^)]*\)/gi, '')
-    .replace(/@import[^;]*;?/gi, '')
-    .replace(/javascript:/gi, '');
 
 const FONTS = [
   { value: 'default', label: 'Default' },

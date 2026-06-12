@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import PageAnimator from '../components/PageAnimator';
 import BombPartyLobby from '../components/bombparty/BombPartyLobby';
 import BombPartyGame from '../components/bombparty/BombPartyGame';
@@ -36,6 +36,15 @@ const BombParty: React.FC = () => {
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [nickname, setNickname] = useState(profile?.minecraft_username || '');
 
+  // Wrapper to handle both direct values and updater functions
+  const updateRoomState = useCallback((update: RoomState | null | ((prev: RoomState | null) => RoomState | null)) => {
+    if (typeof update === 'function') {
+      setRoomState(update);
+    } else {
+      setRoomState(update);
+    }
+  }, []);
+
   return (
     <PageAnimator className="relative w-full overflow-hidden px-4 pb-14 pt-8 sm:px-margin">
       {/* Background effects */}
@@ -64,12 +73,12 @@ const BombParty: React.FC = () => {
             nickname={nickname}
             setNickname={setNickname}
             roomState={roomState}
-            setRoomState={setRoomState}
+            setRoomState={updateRoomState}
           />
         ) : (
           <BombPartyGame
             roomState={roomState}
-            setRoomState={setRoomState}
+            setRoomState={updateRoomState}
             nickname={nickname}
           />
         )}

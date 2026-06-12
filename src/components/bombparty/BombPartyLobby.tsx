@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../config/supabaseClient';
 import { getRandomSyllable, loadDictionary } from '../../utils/bombPartyDictionary';
 import type { RoomState, BombPartyPlayer, RoomSettings } from '../../pages/BombParty';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface Props {
   nickname: string;
   setNickname: (n: string) => void;
   roomState: RoomState | null;
-  setRoomState: (r: RoomState | null) => void;
+  setRoomState: (r: RoomState | null | ((prev: RoomState | null) => RoomState | null)) => void;
 }
 
 function generateRoomCode(): string {
@@ -32,26 +33,91 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState<RoomSettings>(DEFAULT_SETTINGS);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const playerIdRef = useRef<string>(crypto.randomUUID());
 
-  // Subscribe to room changes when in a room
+  // Cleanup channel on unmount
   useEffect(() => {
-    if (!roomState) return;
-
-    const channel = supabase.channel(`bombparty:${roomState.roomCode}`);
-
-    channel
-      .on('broadcast', { event: 'room_update' }, ({ payload }) => {
-        setRoomState(payload as RoomState);
-      })
-      .on('broadcast', { event: 'game_start' }, ({ payload }) => {
-        setRoomState(payload as RoomState);
-      })
-      .subscribe();
-
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
     };
-  }, [roomState?.roomCode, setRoomState]);
+  }, []);
+
+  // Subscribe to Presence + Broadcast for real-time player sync
+  const subscribeToRoom = useCallback((
+    roomCode: string,
+    myPlayer: BombPartyPlayer,
+    roomSettings: RoomSettings,
+    isHost: boolean
+  ) => {
+    // Remove old channel if exists
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
+    const channel = supabase.channel(`bombparty:${roomCode}`, {
+      config: { presence: { key: myPlayer.id } },
+    });
+
+    // Track presence state to build player list
+    channel.on('presence', { event: 'sync' }, () => {
+      const presenceState = channel.presenceState();
+      const players: BombPartyPlayer[] = [];
+
+      Object.values(presenceState).forEach((presences) => {
+        // Each key has an array of presences (usually 1)
+        const p = (presences as unknown as { player: BombPartyPlayer }[])[0];
+        if (p?.player) {
+          players.push(p.player);
+        }
+      });
+
+      // Sort: host first, then by join order (id)
+      players.sort((a, b) => {
+        if (a.isHost && !b.isHost) return -1;
+        if (!a.isHost && b.isHost) return 1;
+        return a.id.localeCompare(b.id);
+      });
+
+      setRoomState((prev) => {
+        const base = prev || {
+          roomCode,
+          players: [],
+          status: 'waiting' as const,
+          currentTurnIndex: 0,
+          currentSyllable: '',
+          roundNumber: 0,
+          settings: roomSettings,
+          syllableFailCount: 0,
+        };
+        return { ...base, players };
+      });
+    });
+
+    // Listen for game start broadcast from host
+    channel.on('broadcast', { event: 'game_start' }, ({ payload }) => {
+      setRoomState(payload as RoomState);
+    });
+
+    // Listen for settings update from host
+    channel.on('broadcast', { event: 'settings_update' }, ({ payload }) => {
+      setRoomState((prev) => prev ? { ...prev, settings: payload as RoomSettings } : prev);
+    });
+
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        // Track this player in presence
+        await channel.track({
+          player: myPlayer,
+          isHost,
+        });
+      }
+    });
+
+    channelRef.current = channel;
+  }, [setRoomState]);
 
   const createRoom = async () => {
     if (!nickname.trim()) {
@@ -63,7 +129,7 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
 
     const roomCode = generateRoomCode();
     const player: BombPartyPlayer = {
-      id: crypto.randomUUID(),
+      id: playerIdRef.current,
       nickname: nickname.trim(),
       lives: settings.startLives,
       score: 0,
@@ -81,15 +147,8 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
       syllableFailCount: 0,
     };
 
-    const channel = supabase.channel(`bombparty:${roomCode}`);
-    channel.subscribe();
-    await channel.send({
-      type: 'broadcast',
-      event: 'room_update',
-      payload: newRoom,
-    });
-
     setRoomState(newRoom);
+    subscribeToRoom(roomCode, player, settings, true);
     setLoading(false);
   };
 
@@ -107,31 +166,12 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
 
     const code = joinCode.trim().toUpperCase();
     const player: BombPartyPlayer = {
-      id: crypto.randomUUID(),
+      id: playerIdRef.current,
       nickname: nickname.trim(),
       lives: DEFAULT_SETTINGS.startLives,
       score: 0,
       isHost: false,
     };
-
-    const channel = supabase.channel(`bombparty:${code}`);
-
-    channel
-      .on('broadcast', { event: 'room_update' }, ({ payload }) => {
-        setRoomState(payload as RoomState);
-      })
-      .on('broadcast', { event: 'game_start' }, ({ payload }) => {
-        setRoomState(payload as RoomState);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.send({
-            type: 'broadcast',
-            event: 'player_join',
-            payload: player,
-          });
-        }
-      });
 
     const joinedRoom: RoomState = {
       roomCode: code,
@@ -145,6 +185,7 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
     };
 
     setRoomState(joinedRoom);
+    subscribeToRoom(code, player, DEFAULT_SETTINGS, false);
     setLoading(false);
   };
 
@@ -157,8 +198,16 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
     await loadDictionary();
     const syllable = getRandomSyllable();
 
+    // Assign lives to all players based on settings
+    const playersWithLives = roomState.players.map(p => ({
+      ...p,
+      lives: roomState.settings.startLives,
+      score: 0,
+    }));
+
     const startedRoom: RoomState = {
       ...roomState,
+      players: playersWithLives,
       status: 'playing',
       currentSyllable: syllable,
       roundNumber: 1,
@@ -166,18 +215,19 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
       syllableFailCount: 0,
     };
 
-    const channel = supabase.channel(`bombparty:${roomState.roomCode}`);
-    channel.subscribe();
-    await channel.send({
-      type: 'broadcast',
-      event: 'game_start',
-      payload: startedRoom,
-    });
+    // Broadcast game start to all players
+    if (channelRef.current) {
+      await channelRef.current.send({
+        type: 'broadcast',
+        event: 'game_start',
+        payload: startedRoom,
+      });
+    }
 
     setRoomState(startedRoom);
   };
 
-  const isHost = roomState?.players.some(p => p.isHost && p.nickname === nickname);
+  const isHost = roomState?.players.some(p => p.isHost && p.id === playerIdRef.current);
 
   // Lobby waiting room
   if (roomState) {
@@ -210,7 +260,10 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border-[2px] border-black bg-primary-container">
                   <span className="material-symbols-outlined text-[20px] text-white">person</span>
                 </div>
-                <span className="font-headline-md text-[14px] text-white">{player.nickname}</span>
+                <span className="font-headline-md text-[14px] text-white">
+                  {player.nickname}
+                  {player.id === playerIdRef.current && ' (tu)'}
+                </span>
                 {player.isHost && (
                   <span className="ml-auto rounded-lg border-[2px] border-black bg-orange-500 px-2 py-0.5 font-label-caps text-[10px] text-white">
                     HOST
@@ -254,6 +307,14 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
             <span className="material-symbols-outlined mr-2 align-middle text-[24px]">play_arrow</span>
             INIZIA PARTITA
           </button>
+        )}
+
+        {!isHost && (
+          <div className="rounded-xl border-[3px] border-black bg-surface-container-high p-4 text-center">
+            <p className="font-body-lg text-on-surface-variant">
+              ⏳ In attesa che l'host avvii la partita...
+            </p>
+          </div>
         )}
 
         {error && (

@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../config/supabaseClient';
 import { validateWord, getRandomSyllable, loadDictionary, isDictionaryLoaded } from '../../utils/bombPartyDictionary';
 import type { RoomState } from '../../pages/BombParty';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import BombTimer from './BombTimer';
 
 interface Props {
   roomState: RoomState;
-  setRoomState: (r: RoomState | null) => void;
+  setRoomState: (r: RoomState | null | ((prev: RoomState | null) => RoomState | null)) => void;
   nickname: string;
 }
 
@@ -15,36 +16,84 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' | '' }>({ message: '', type: '' });
   const [timeLeft, setTimeLeft] = useState(roomState.settings.turnTime);
   const [usedWords, setUsedWords] = useState<Set<string>>(new Set());
-  const [, setDictReady] = useState(isDictionaryLoaded());
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const roomStateRef = useRef(roomState);
+
+  // Keep ref in sync with state for use in callbacks
+  useEffect(() => {
+    roomStateRef.current = roomState;
+  }, [roomState]);
 
   // Load dictionary on mount
   useEffect(() => {
     if (!isDictionaryLoaded()) {
-      loadDictionary().then(() => setDictReady(true));
+      loadDictionary();
     }
   }, []);
 
   const currentPlayer = roomState.players[roomState.currentTurnIndex];
   const isMyTurn = currentPlayer?.nickname === nickname;
-
   const alivePlayers = roomState.players.filter(p => p.lives > 0);
+
+  // Setup single persistent channel for the game
+  useEffect(() => {
+    const channel = supabase.channel(`bombparty-game:${roomState.roomCode}`);
+
+    channel
+      .on('broadcast', { event: 'game_state_update' }, ({ payload }) => {
+        const newState = payload as RoomState;
+        setRoomState(newState);
+        setTimeLeft(newState.settings.turnTime);
+        setInput('');
+      })
+      .on('broadcast', { event: 'word_accepted' }, ({ payload }) => {
+        const { newState, word } = payload as { newState: RoomState; word: string };
+        setRoomState(newState);
+        setUsedWords(prev => new Set([...prev, word.toLowerCase()]));
+        setTimeLeft(newState.settings.turnTime);
+        setInput('');
+        setFeedback({ message: '', type: '' });
+      })
+      .on('broadcast', { event: 'game_over' }, ({ payload }) => {
+        setRoomState(payload as RoomState);
+        if (timerRef.current) clearInterval(timerRef.current);
+      })
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomState.roomCode, setRoomState]);
 
   // Check for winner
   useEffect(() => {
     if (alivePlayers.length === 1 && roomState.status === 'playing') {
-      setRoomState({ ...roomState, status: 'finished' });
+      const finishedState: RoomState = { ...roomState, status: 'finished' };
+      setRoomState(finishedState);
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'game_over',
+          payload: finishedState,
+        });
+      }
     }
-  }, [alivePlayers.length, roomState, setRoomState]);
+  }, [alivePlayers.length]);
 
-  // Timer logic
+  // Timer logic - only the current player runs the authoritative timer
   useEffect(() => {
     if (roomState.status !== 'playing') return;
 
     setTimeLeft(roomState.settings.turnTime);
 
     if (timerRef.current) clearInterval(timerRef.current);
+
+    // Only run timer if it's my turn (authoritative timer)
+    if (!isMyTurn) return;
 
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -59,7 +108,19 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [roomState.currentTurnIndex, roomState.currentSyllable, roomState.status]);
+  }, [roomState.currentTurnIndex, roomState.currentSyllable, roomState.status, isMyTurn]);
+
+  // Non-authoritative timer for other players (visual only)
+  useEffect(() => {
+    if (roomState.status !== 'playing' || isMyTurn) return;
+
+    // Visual countdown for non-active players
+    const visualTimer = setInterval(() => {
+      setTimeLeft((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+
+    return () => clearInterval(visualTimer);
+  }, [roomState.currentTurnIndex, roomState.currentSyllable, roomState.status, isMyTurn]);
 
   // Focus input on my turn
   useEffect(() => {
@@ -68,116 +129,88 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
     }
   }, [isMyTurn]);
 
-  // Listen for broadcast events
-  useEffect(() => {
-    const channel = supabase.channel(`bombparty:${roomState.roomCode}`);
-
-    channel
-      .on('broadcast', { event: 'word_submitted' }, ({ payload }) => {
-        const { newState, word } = payload as { newState: RoomState; word: string };
-        setRoomState(newState);
-        setUsedWords(prev => new Set([...prev, word.toLowerCase()]));
-        setTimeLeft(newState.settings.turnTime);
-        setInput('');
-        setFeedback({ message: '', type: '' });
-      })
-      .on('broadcast', { event: 'time_up' }, ({ payload }) => {
-        setRoomState(payload as RoomState);
-        setTimeLeft((payload as RoomState).settings.turnTime);
-        setInput('');
-      })
-      .on('broadcast', { event: 'game_over' }, ({ payload }) => {
-        setRoomState(payload as RoomState);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [roomState.roomCode, setRoomState]);
-
   const handleTimeUp = useCallback(async () => {
-    if (!isMyTurn) return;
+    const state = roomStateRef.current;
+    const currentP = state.players[state.currentTurnIndex];
+    if (currentP?.nickname !== nickname) return;
 
-    const updatedPlayers = roomState.players.map((p, i) =>
-      i === roomState.currentTurnIndex ? { ...p, lives: p.lives - 1 } : p
+    const updatedPlayers = state.players.map((p, i) =>
+      i === state.currentTurnIndex ? { ...p, lives: p.lives - 1 } : p
     );
 
     const alive = updatedPlayers.filter(p => p.lives > 0);
 
     if (alive.length <= 1) {
       const finishedState: RoomState = {
-        ...roomState,
+        ...state,
         players: updatedPlayers,
         status: 'finished',
       };
 
-      const channel = supabase.channel(`bombparty:${roomState.roomCode}`);
-      channel.subscribe();
-      await channel.send({
-        type: 'broadcast',
-        event: 'game_over',
-        payload: finishedState,
-      });
+      if (channelRef.current) {
+        await channelRef.current.send({
+          type: 'broadcast',
+          event: 'game_over',
+          payload: finishedState,
+        });
+      }
       setRoomState(finishedState);
+      if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
 
     // Move to next alive player
-    let nextIndex = (roomState.currentTurnIndex + 1) % updatedPlayers.length;
+    let nextIndex = (state.currentTurnIndex + 1) % updatedPlayers.length;
     while (updatedPlayers[nextIndex].lives <= 0) {
       nextIndex = (nextIndex + 1) % updatedPlayers.length;
     }
 
-    // Logica età sillaba: se il contatore fallimenti raggiunge syllableMaxAge, cambia sillaba
-    const newFailCount = roomState.syllableFailCount + 1;
-    const shouldChangeSyllable = newFailCount >= roomState.settings.syllableMaxAge;
-    const newSyllable = shouldChangeSyllable ? getRandomSyllable() : roomState.currentSyllable;
+    // Syllable age logic
+    const newFailCount = state.syllableFailCount + 1;
+    const shouldChangeSyllable = newFailCount >= state.settings.syllableMaxAge;
+    const newSyllable = shouldChangeSyllable ? getRandomSyllable() : state.currentSyllable;
 
     const newState: RoomState = {
-      ...roomState,
+      ...state,
       players: updatedPlayers,
       currentTurnIndex: nextIndex,
       currentSyllable: newSyllable,
-      roundNumber: roomState.roundNumber + 1,
+      roundNumber: state.roundNumber + 1,
       syllableFailCount: shouldChangeSyllable ? 0 : newFailCount,
     };
 
-    const channel = supabase.channel(`bombparty:${roomState.roomCode}`);
-    channel.subscribe();
-    await channel.send({
-      type: 'broadcast',
-      event: 'time_up',
-      payload: newState,
-    });
+    if (channelRef.current) {
+      await channelRef.current.send({
+        type: 'broadcast',
+        event: 'game_state_update',
+        payload: newState,
+      });
+    }
 
     setRoomState(newState);
-  }, [isMyTurn, roomState, setRoomState]);
+  }, [nickname, setRoomState]);
 
   const submitWord = async () => {
     if (!isMyTurn || !input.trim()) return;
 
     const word = input.trim().toLowerCase();
 
-    // Check if word was already used
     if (usedWords.has(word)) {
       setFeedback({ message: 'Parola già usata!', type: 'error' });
       return;
     }
 
-    // Check if word contains the syllable
     if (!word.includes(roomState.currentSyllable.toLowerCase())) {
       setFeedback({ message: `La parola deve contenere "${roomState.currentSyllable}"!`, type: 'error' });
       return;
     }
 
-    // Validate word against dictionary
     if (!validateWord(word)) {
       setFeedback({ message: 'Parola non valida!', type: 'error' });
       return;
     }
 
-    // Word is valid - move to next player
+    // Word is valid
     setUsedWords(prev => new Set([...prev, word]));
 
     const updatedPlayers = roomState.players.map((p, i) =>
@@ -189,7 +222,6 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
       nextIndex = (nextIndex + 1) % updatedPlayers.length;
     }
 
-    // Parola valida = sillaba cambia sempre e reset fail count
     const newSyllable = getRandomSyllable();
     const newState: RoomState = {
       ...roomState,
@@ -200,13 +232,13 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
       syllableFailCount: 0,
     };
 
-    const channel = supabase.channel(`bombparty:${roomState.roomCode}`);
-    channel.subscribe();
-    await channel.send({
-      type: 'broadcast',
-      event: 'word_submitted',
-      payload: { newState, word },
-    });
+    if (channelRef.current) {
+      await channelRef.current.send({
+        type: 'broadcast',
+        event: 'word_accepted',
+        payload: { newState, word },
+      });
+    }
 
     setRoomState(newState);
     setInput('');
@@ -221,6 +253,9 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
   };
 
   const leaveGame = () => {
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
     setRoomState(null);
   };
 

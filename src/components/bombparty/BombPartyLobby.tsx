@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../config/supabaseClient';
 import { getRandomSyllable, loadDictionary } from '../../utils/bombPartyDictionary';
 import { useAuth } from '../../context/AuthContext';
+import { rollBombEvent } from '../../config/bombPartyEvents';
 import type { RoomState, BombPartyPlayer, RoomSettings } from '../../pages/BombParty';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -94,6 +95,7 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
           roundNumber: 0,
           settings: roomSettings,
           syllableFailCount: 0,
+      currentBomb: 'normal',
         };
         return { ...base, players };
       });
@@ -149,6 +151,7 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
       roundNumber: 0,
       settings,
       syllableFailCount: 0,
+      currentBomb: 'normal',
     };
 
     setRoomState(newRoom);
@@ -187,6 +190,7 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
       roundNumber: 0,
       settings: DEFAULT_SETTINGS,
       syllableFailCount: 0,
+      currentBomb: 'normal',
     };
 
     setRoomState(joinedRoom);
@@ -218,6 +222,7 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
       roundNumber: 1,
       currentTurnIndex: 0,
       syllableFailCount: 0,
+      currentBomb: rollBombEvent(true),
     };
 
     // Broadcast game start to all players

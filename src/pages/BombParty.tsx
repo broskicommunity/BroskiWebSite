@@ -4,6 +4,8 @@ import BombPartyLobby from '../components/bombparty/BombPartyLobby';
 import BombPartyGame from '../components/bombparty/BombPartyGame';
 import { useAuth } from '../context/AuthContext';
 
+import type { BombType } from '../config/bombPartyEvents';
+
 export interface BombPartyPlayer {
   id: string;
   nickname: string;
@@ -28,7 +30,8 @@ export interface RoomState {
   currentSyllable: string;
   roundNumber: number;
   settings: RoomSettings;
-  syllableFailCount: number; // Contatore fallimenti sulla sillaba corrente
+  syllableFailCount: number;
+  currentBomb: BombType;     // Tipo di bomba corrente (imprevisto)
 }
 
 const BombParty: React.FC = () => {

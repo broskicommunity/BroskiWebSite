@@ -115,10 +115,8 @@ const BombParty: React.FC = () => {
 
   const handleReconnect = () => {
     if (reconnectRoom) {
-      navigate(`/bomb-party/${reconnectRoom}`);
       setReconnectRoom(null);
-      // The lobby will auto-join using the URL param
-      window.location.reload();
+      navigate(`/bomb-party/${reconnectRoom}`, { replace: true });
     }
   };
 

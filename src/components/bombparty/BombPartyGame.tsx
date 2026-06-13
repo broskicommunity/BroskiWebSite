@@ -260,14 +260,13 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
         if (word.length >= 7) {
           updatedPlayers = updatedPlayers.map((p, i) =>
             i === roomState.currentTurnIndex
-              ? { ...p, lives: Math.min(p.lives + 1, roomState.settings.maxLives), score: p.score + word.length }
+              ? { ...p, lives: Math.min(p.lives + 1, roomState.settings.maxLives), score: p.score + word.length, hasShield: false }
               : p
           );
           bonusMessage = '💰 PAROLA LUNGA! +1 vita!';
         } else {
-          // Parola valida ma troppo corta, niente bonus
           updatedPlayers = updatedPlayers.map((p, i) =>
-            i === roomState.currentTurnIndex ? { ...p, score: p.score + word.length } : p
+            i === roomState.currentTurnIndex ? { ...p, score: p.score + word.length, hasShield: false } : p
           );
           bonusMessage = '💰 Parola troppo corta per il bonus! (servono 7+ lettere)';
         }
@@ -277,11 +276,11 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
         // Shock: tutti gli avversari perdono 1 vita (scudo li protegge)
         updatedPlayers = updatedPlayers.map((p, i) => {
           if (i === roomState.currentTurnIndex) {
-            return { ...p, score: p.score + word.length };
+            return { ...p, score: p.score + word.length, hasShield: false };
           }
           if (p.lives > 0) {
             if (p.hasShield) {
-              return { ...p, hasShield: false }; // Scudo consumato
+              return { ...p, hasShield: false };
             }
             return { ...p, lives: p.lives - 1 };
           }
@@ -291,10 +290,9 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
         break;
 
       case 'striped':
-        // Timer Bomba: tempo dimezzato (già gestito dal effectiveTurnTime)
-        // Nessun effetto speciale extra sulla parola
+        // Timer Bomba: tempo dimezzato, scudo consumato
         updatedPlayers = updatedPlayers.map((p, i) =>
-          i === roomState.currentTurnIndex ? { ...p, score: p.score + word.length } : p
+          i === roomState.currentTurnIndex ? { ...p, score: p.score + word.length, hasShield: false } : p
         );
         bonusMessage = '🎯 Bravo! Hai battuto il timer dimezzato!';
         break;
@@ -310,9 +308,9 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
         break;
 
       default:
-        // Normale: solo punti
+        // Normale: solo punti, ma consuma scudo se presente (scudo dura 1 turno)
         updatedPlayers = updatedPlayers.map((p, i) =>
-          i === roomState.currentTurnIndex ? { ...p, score: p.score + word.length } : p
+          i === roomState.currentTurnIndex ? { ...p, score: p.score + word.length, hasShield: false } : p
         );
         break;
     }

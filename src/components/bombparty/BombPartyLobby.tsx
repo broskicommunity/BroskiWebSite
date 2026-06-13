@@ -42,7 +42,6 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
   const [linkCopied, setLinkCopied] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const playerIdRef = useRef<string>(crypto.randomUUID());
-  const autoJoinedRef = useRef(false);
 
   // Cleanup channel on unmount
   useEffect(() => {
@@ -54,17 +53,14 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
   }, []);
 
   // Auto-join if initialJoinCode is provided (from URL)
+  const hasAutoJoined = useRef(false);
   useEffect(() => {
-    if (initialJoinCode && !autoJoinedRef.current && !roomState && nickname) {
-      autoJoinedRef.current = true;
-      setJoinCode(initialJoinCode);
-      // Trigger join after a small delay to allow state to settle
-      setTimeout(() => {
-        const joinBtn = document.getElementById('bomb-party-auto-join');
-        if (joinBtn) joinBtn.click();
-      }, 500);
+    if (initialJoinCode && !hasAutoJoined.current && !roomState && (nickname || isLoggedIn)) {
+      hasAutoJoined.current = true;
+      // Call joinRoom directly with the code
+      joinWithCode(initialJoinCode);
     }
-  }, [initialJoinCode, roomState, nickname]);
+  }, [initialJoinCode, roomState, nickname, isLoggedIn]);
 
   const copyRoomLink = () => {
     if (!roomState) return;
@@ -200,27 +196,21 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
     setLoading(false);
   };
 
-  const joinRoom = async () => {
-    if (!nickname.trim() && !isLoggedIn) {
-      setError('Inserisci un nickname!');
-      return;
-    }
-    if (!joinCode.trim()) {
-      setError('Inserisci il codice della stanza!');
-      return;
-    }
+  const joinWithCode = async (code: string) => {
+    const finalNickname = nickname.trim() || profile?.minecraft_username || 'Player';
+    if (!finalNickname) return;
+
     setLoading(true);
     setError('');
 
-    const finalNickname = nickname.trim() || profile?.minecraft_username || 'Player';
-    const code = joinCode.trim().toUpperCase();
+    const upperCode = code.trim().toUpperCase();
     const avatarUrl = finalNickname ? `https://mc-heads.net/avatar/${finalNickname}/64` : undefined;
 
     // Verifica che la stanza esista nel database
     const { data: roomData } = await supabase
       .from('bomb_party_rooms')
-      .select('status, settings')
-      .eq('room_code', code)
+      .select('status, settings, host_id')
+      .eq('room_code', upperCode)
       .single();
 
     if (!roomData) {
@@ -229,15 +219,19 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
       return;
     }
 
-    // Se la partita è già in corso, entra come spettatore
-    const isSpectator = roomData.status === 'playing';
+    // Check if I'm the host (reconnecting)
+    const { data: { user } } = await supabase.auth.getUser();
+    const amIHost = user ? roomData.host_id === user.id : false;
+
+    // Se la partita è già in corso e non sono l'host, entra come spettatore
+    const isSpectator = roomData.status === 'playing' && !amIHost;
 
     const player: BombPartyPlayer = {
       id: playerIdRef.current,
       nickname: finalNickname,
       lives: isSpectator ? 0 : DEFAULT_SETTINGS.startLives,
       score: 0,
-      isHost: false,
+      isHost: amIHost,
       hasShield: false,
       avatarUrl,
       isSpectator,
@@ -246,7 +240,7 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
     const roomSettings = (roomData.settings as RoomSettings) || DEFAULT_SETTINGS;
 
     const joinedRoom: RoomState = {
-      roomCode: code,
+      roomCode: upperCode,
       players: [player],
       status: roomData.status as RoomState['status'],
       currentTurnIndex: 0,
@@ -258,8 +252,20 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
     };
 
     setRoomState(joinedRoom);
-    subscribeToRoom(code, player, DEFAULT_SETTINGS, false);
+    subscribeToRoom(upperCode, player, roomSettings, amIHost);
     setLoading(false);
+  };
+
+  const joinRoom = async () => {
+    if (!nickname.trim() && !isLoggedIn) {
+      setError('Inserisci un nickname!');
+      return;
+    }
+    if (!joinCode.trim()) {
+      setError('Inserisci il codice della stanza!');
+      return;
+    }
+    await joinWithCode(joinCode);
   };
 
   const startGame = async () => {
@@ -633,7 +639,6 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
           </div>
 
           <button
-            id="bomb-party-auto-join"
             onClick={joinRoom}
             disabled={loading}
             className="w-full rounded-2xl border-[3px] border-black bg-blue-600 px-6 py-3 font-headline-md text-[16px] text-white shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[7px_7px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none disabled:opacity-50"

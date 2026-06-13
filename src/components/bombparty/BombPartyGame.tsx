@@ -351,7 +351,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
 
     setRoomState(newState);
     setInput('');
-    const baseMsg = `✓ "${word}" (+${points} pts)`;
+    const baseMsg = `✓ "${word}" accettata!`;
     setFeedback({
       message: bonusMessage ? `${baseMsg} — ${bonusMessage}` : baseMsg,
       type: bonusMessage ? 'event' : 'success',

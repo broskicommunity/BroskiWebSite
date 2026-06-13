@@ -229,6 +229,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
       await channelRef.current.send({ type: 'broadcast', event: 'game_state_update', payload: newState });
     }
     setRoomState(newState);
+    saveGameState(newState);
   }, [nickname, setRoomState, getNextBomb]);
 
   const submitWord = async () => {
@@ -354,6 +355,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
     }
 
     setRoomState(newState);
+    saveGameState(newState);
     setInput('');
     const baseMsg = `✓ "${word}" accettata!`;
     setFeedback({

@@ -209,7 +209,7 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
     // Verifica che la stanza esista nel database
     const { data: roomData } = await supabase
       .from('bomb_party_rooms')
-      .select('status, settings, host_id')
+      .select('status, settings, host_id, game_state')
       .eq('room_code', upperCode)
       .single();
 
@@ -223,18 +223,51 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
     const { data: { user } } = await supabase.auth.getUser();
     const amIHost = user ? roomData.host_id === user.id : false;
 
-    // Se la partita è già in corso e non sono l'host, entra come spettatore
-    const isSpectator = roomData.status === 'playing' && !amIHost;
+    // Se la partita è in corso, prova a riconnettermi se ero un player
+    if (roomData.status === 'playing' && roomData.game_state) {
+      const savedState = roomData.game_state as RoomState;
+      const myPlayerInGame = savedState.players.find(
+        p => p.nickname === finalNickname
+      );
 
+      if (myPlayerInGame) {
+        // RECONNECT: ero un giocatore attivo, rientro con il mio stato
+        setRoomState(savedState);
+        // Subscribe al canale di gioco - il game component si occuperà del resto
+        setLoading(false);
+        return;
+      }
+
+      // Non ero un player → spettatore
+      const spectator: BombPartyPlayer = {
+        id: playerIdRef.current,
+        nickname: finalNickname,
+        lives: 0,
+        score: 0,
+        isHost: false,
+        hasShield: false,
+        avatarUrl,
+        isSpectator: true,
+      };
+
+      // Set state as the saved game state but I'm a spectator watching
+      setRoomState({
+        ...savedState,
+        players: [...savedState.players, spectator],
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Stanza in waiting - join normale
     const player: BombPartyPlayer = {
       id: playerIdRef.current,
       nickname: finalNickname,
-      lives: isSpectator ? 0 : DEFAULT_SETTINGS.startLives,
+      lives: DEFAULT_SETTINGS.startLives,
       score: 0,
       isHost: amIHost,
       hasShield: false,
       avatarUrl,
-      isSpectator,
     };
 
     const roomSettings = (roomData.settings as RoomSettings) || DEFAULT_SETTINGS;
@@ -242,7 +275,7 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
     const joinedRoom: RoomState = {
       roomCode: upperCode,
       players: [player],
-      status: roomData.status as RoomState['status'],
+      status: 'waiting',
       currentTurnIndex: 0,
       currentSyllable: '',
       roundNumber: 0,

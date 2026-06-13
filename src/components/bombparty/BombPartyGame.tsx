@@ -94,16 +94,18 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
     return () => { supabase.removeChannel(channel); };
   }, [roomState.roomCode, setRoomState, nickname]);
 
-  // Winner check
+  // Winner check - only if game has more than 1 player total
   useEffect(() => {
-    if (alivePlayers.length === 1 && roomState.status === 'playing') {
+    if (roomState.status !== 'playing') return;
+    if (roomState.players.length < 2) return;
+    if (alivePlayers.length === 1) {
       const finishedState: RoomState = { ...roomState, status: 'finished' };
       setRoomState(finishedState);
       if (channelRef.current) {
         channelRef.current.send({ type: 'broadcast', event: 'game_over', payload: finishedState });
       }
     }
-  }, [alivePlayers.length]);
+  }, [alivePlayers.length, roomState.status, roomState.players.length]);
 
   // Authoritative timer
   useEffect(() => {
@@ -403,7 +405,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname }) =
         >
           <div className="flex flex-col items-center gap-2">
             {/* Immagine bomba con ring colorato */}
-            <div className={`relative overflow-hidden flex h-36 w-36 items-center justify-center rounded-full ring-4 ${currentBombEvent.glowColor} sm:h-44 sm:w-44`}>
+            <div className={`relative flex h-36 w-36 items-center justify-center rounded-full ring-4 ${currentBombEvent.glowColor} sm:h-44 sm:w-44`}>
               <img
                 src={currentBombEvent.image}
                 alt={currentBombEvent.name}

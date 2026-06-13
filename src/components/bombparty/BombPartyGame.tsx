@@ -47,8 +47,6 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roomStateRef = useRef(roomState);
   const gameStartTimeRef = useRef(Date.now());
-  // Track the turn to detect stale fallback timers
-  const lastTurnRef = useRef({ turnIndex: roomState.currentTurnIndex, round: roomState.roundNumber });
 
   useEffect(() => { roomStateRef.current = roomState; }, [roomState]);
   useEffect(() => { if (!isDictionaryLoaded()) loadDictionary(); }, []);
@@ -106,7 +104,6 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
     setTimeLeft(effectiveTurnTime);
     setInput('');
     setPlayerInputs({});
-    lastTurnRef.current = { turnIndex: roomState.currentTurnIndex, round: roomState.roundNumber };
   }, [roomState.currentTurnIndex, roomState.roundNumber, effectiveTurnTime]);
 
   // Note: winner checking is done inline in handleTimeUp, handleTimeUpFallback, and submitWord
@@ -140,15 +137,26 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
     return () => clearInterval(visualTimer);
   }, [roomState.currentTurnIndex, roomState.roundNumber, roomState.status, isMyTurn]);
 
-  // FALLBACK TIMER: if I'm NOT the current turn player, and the timer
-  // reaches 0 + FALLBACK_TIMER_EXTRA_MS without a state update, I fire handleTimeUp
+  // FALLBACK TIMER: if the current turn player disconnects, exactly ONE other client
+  // must fire the time-up. We designate the "fallback authority" as the lowest-index
+  // alive player that is NOT the current turn player. This prevents multiple clients
+  // from broadcasting divergent states simultaneously.
+  const fallbackAuthorityNickname = (() => {
+    const candidate = roomState.players.find(
+      (p, i) => p.lives > 0 && !p.isSpectator && i !== roomState.currentTurnIndex
+    );
+    return candidate?.nickname;
+  })();
+  const isFallbackAuthority = fallbackAuthorityNickname === nickname;
+
   useEffect(() => {
-    if (roomState.status !== 'playing' || isMyTurn) {
+    // Only the designated fallback authority arms the fallback timer, and only
+    // when it's NOT their own turn.
+    if (roomState.status !== 'playing' || isMyTurn || !isFallbackAuthority) {
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
       return;
     }
 
-    // Clear any existing fallback
     if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
 
     // Set fallback to fire after effectiveTurnTime + grace period
@@ -168,7 +176,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
     }, totalMs);
 
     return () => { if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current); };
-  }, [roomState.currentTurnIndex, roomState.roundNumber, roomState.status, isMyTurn, effectiveTurnTime]);
+  }, [roomState.currentTurnIndex, roomState.roundNumber, roomState.status, isMyTurn, isFallbackAuthority, effectiveTurnTime]);
 
   // Focus input on my turn
   useEffect(() => {
@@ -331,13 +339,13 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
         if (word.length >= 7) {
           updatedPlayers = updatedPlayers.map((p, i) =>
             i === roomState.currentTurnIndex
-              ? { ...p, lives: Math.min(p.lives + 1, roomState.settings.maxLives), score: p.score + word.length, hasShield: false }
+              ? { ...p, lives: Math.min(p.lives + 1, roomState.settings.maxLives), score: p.score + 1, hasShield: false }
               : p
           );
           bonusMessage = '💰 PAROLA LUNGA! +1 vita!';
         } else {
           updatedPlayers = updatedPlayers.map((p, i) =>
-            i === roomState.currentTurnIndex ? { ...p, score: p.score + word.length, hasShield: false } : p
+            i === roomState.currentTurnIndex ? { ...p, score: p.score + 1, hasShield: false } : p
           );
           bonusMessage = '💰 Parola troppo corta per il bonus! (servono 7+ lettere)';
         }
@@ -346,7 +354,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
       case 'lightning':
         updatedPlayers = updatedPlayers.map((p, i) => {
           if (i === roomState.currentTurnIndex) {
-            return { ...p, score: p.score + word.length, hasShield: false };
+            return { ...p, score: p.score + 1, hasShield: false };
           }
           if (p.lives > 0) {
             if (p.hasShield) return { ...p, hasShield: false };
@@ -359,7 +367,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
 
       case 'striped':
         updatedPlayers = updatedPlayers.map((p, i) =>
-          i === roomState.currentTurnIndex ? { ...p, score: p.score + word.length, hasShield: false } : p
+          i === roomState.currentTurnIndex ? { ...p, score: p.score + 1, hasShield: false } : p
         );
         bonusMessage = '🎯 Bravo! Hai battuto il timer dimezzato!';
         break;
@@ -367,7 +375,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
       case 'star':
         updatedPlayers = updatedPlayers.map((p, i) =>
           i === roomState.currentTurnIndex
-            ? { ...p, score: p.score + word.length, hasShield: true }
+            ? { ...p, score: p.score + 1, hasShield: true }
             : p
         );
         bonusMessage = '⭐ SCUDO ATTIVATO! La prossima esplosione non ti farà danno!';
@@ -375,7 +383,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
 
       default:
         updatedPlayers = updatedPlayers.map((p, i) =>
-          i === roomState.currentTurnIndex ? { ...p, score: p.score + word.length, hasShield: false } : p
+          i === roomState.currentTurnIndex ? { ...p, score: p.score + 1, hasShield: false } : p
         );
         break;
     }
@@ -610,7 +618,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
                   )}
                 </div>
                 {isCurrent && typingText && (
-                  <p className="mt-1 max-w-[100px] truncate rounded-lg border-[2px] border-black bg-surface-container-highest px-2 py-0.5 text-center font-headline-md text-[11px] text-primary-container shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] sm:text-[13px]">
+                  <p className="mt-1 max-w-[160px] whitespace-normal break-words rounded-lg border-[2px] border-black bg-surface-container-highest px-2 py-0.5 text-center font-headline-md text-[11px] text-primary-container shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] sm:max-w-[200px] sm:text-[13px]">
                     {typingText}
                   </p>
                 )}

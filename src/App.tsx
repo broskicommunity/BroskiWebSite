@@ -80,6 +80,7 @@ function App() {
                   <Route path="/admin/setup" element={<RequireAuth><AdminSetup /></RequireAuth>} />
                   <Route path="/admin" element={<RequireAuth><RequireAdmin><AdminPanel /></RequireAdmin></RequireAuth>} />
                   <Route path="/bomb-party" element={<BombParty />} />
+                  <Route path="/bomb-party/:roomCode" element={<BombParty />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </div>

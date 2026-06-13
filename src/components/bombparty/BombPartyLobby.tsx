@@ -12,6 +12,7 @@ interface Props {
   setNickname: (n: string) => void;
   roomState: RoomState | null;
   setRoomState: (r: RoomState | null | ((prev: RoomState | null) => RoomState | null)) => void;
+  initialJoinCode?: string;
 }
 
 function generateRoomCode(): string {
@@ -31,15 +32,17 @@ const DEFAULT_SETTINGS: RoomSettings = {
   maxPlayers: 8,
 };
 
-const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, setRoomState }) => {
+const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, setRoomState, initialJoinCode }) => {
   const { profile } = useAuth();
   const isLoggedIn = !!profile?.minecraft_username;
-  const [joinCode, setJoinCode] = useState('');
+  const [joinCode, setJoinCode] = useState(initialJoinCode || '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState<RoomSettings>(DEFAULT_SETTINGS);
+  const [linkCopied, setLinkCopied] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const playerIdRef = useRef<string>(crypto.randomUUID());
+  const autoJoinedRef = useRef(false);
 
   // Cleanup channel on unmount
   useEffect(() => {
@@ -48,6 +51,29 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
         supabase.removeChannel(channelRef.current);
       }
     };
+  }, []);
+
+  // Auto-join if initialJoinCode is provided (from URL)
+  useEffect(() => {
+    if (initialJoinCode && !autoJoinedRef.current && !roomState && nickname) {
+      autoJoinedRef.current = true;
+      setJoinCode(initialJoinCode);
+      // Trigger join after a small delay to allow state to settle
+      setTimeout(() => {
+        const joinBtn = document.getElementById('bomb-party-auto-join');
+        if (joinBtn) joinBtn.click();
+      }, 500);
+    }
+  }, [initialJoinCode, roomState, nickname]);
+
+  const copyRoomLink = () => {
+    if (!roomState) return;
+    const url = `${window.location.origin}/bomb-party/${roomState.roomCode}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  };
   }, []);
 
   // Subscribe to Presence + Broadcast for real-time player sync
@@ -282,6 +308,15 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
             <p className="mt-2 font-body-sm text-on-surface-variant">
               Condividi questo codice con i tuoi amici!
             </p>
+            <button
+              onClick={copyRoomLink}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl border-[3px] border-black bg-surface-container-high px-4 py-2 font-headline-md text-[13px] text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none"
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {linkCopied ? 'check' : 'link'}
+              </span>
+              {linkCopied ? 'Link copiato!' : 'Copia link invito'}
+            </button>
           </div>
         </div>
 
@@ -558,6 +593,7 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
           </div>
 
           <button
+            id="bomb-party-auto-join"
             onClick={joinRoom}
             disabled={loading}
             className="w-full rounded-2xl border-[3px] border-black bg-blue-600 px-6 py-3 font-headline-md text-[16px] text-white shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 hover:shadow-[7px_7px_0px_0px_rgba(0,0,0,1)] active:translate-x-1 active:translate-y-1 active:shadow-none disabled:opacity-50"

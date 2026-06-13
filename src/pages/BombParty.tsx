@@ -1,8 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import PageAnimator from '../components/PageAnimator';
 import BombPartyLobby from '../components/bombparty/BombPartyLobby';
 import BombPartyGame from '../components/bombparty/BombPartyGame';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../config/supabaseClient';
 
 import type { BombType } from '../config/bombPartyEvents';
 
@@ -13,16 +15,16 @@ export interface BombPartyPlayer {
   score: number;
   isHost: boolean;
   hasShield: boolean;
-  avatarUrl?: string;        // URL immagine profilo (skin Minecraft head)
-  isSpectator?: boolean;     // Spettatore (entrato a partita in corso)
+  avatarUrl?: string;
+  isSpectator?: boolean;
 }
 
 export interface RoomSettings {
-  turnTime: number;          // ⏲ Durata minima del turno (secondi)
-  syllableMaxAge: number;    // 🔃 Età massima della sillaba (turni di fallimento prima che cambi)
-  startLives: number;        // ❤️ Vite iniziali
-  maxLives: number;          // ❤️ Vite massime
-  maxPlayers: number;        // 👱‍♂️ Numero massimo di giocatori
+  turnTime: number;
+  syllableMaxAge: number;
+  startLives: number;
+  maxLives: number;
+  maxPlayers: number;
 }
 
 export interface RoomState {
@@ -34,22 +36,75 @@ export interface RoomState {
   roundNumber: number;
   settings: RoomSettings;
   syllableFailCount: number;
-  currentBomb: BombType;     // Tipo di bomba corrente (imprevisto)
+  currentBomb: BombType;
 }
+
+const RECONNECT_KEY = 'bombparty_active_room';
 
 const BombParty: React.FC = () => {
   const { profile } = useAuth();
+  const { roomCode: urlRoomCode } = useParams<{ roomCode?: string }>();
+  const navigate = useNavigate();
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [nickname, setNickname] = useState(profile?.minecraft_username || '');
+  const [reconnectRoom, setReconnectRoom] = useState<string | null>(null);
 
-  // Sync nickname when profile loads asynchronously
+  // Sync nickname when profile loads
   useEffect(() => {
     if (profile?.minecraft_username && !nickname) {
       setNickname(profile.minecraft_username);
     }
   }, [profile?.minecraft_username]);
 
-  // Wrapper to handle both direct values and updater functions
+  // Check for active room to reconnect to
+  useEffect(() => {
+    const savedRoom = localStorage.getItem(RECONNECT_KEY);
+    if (savedRoom && !roomState && !urlRoomCode) {
+      // Verify room still exists and is active
+      supabase
+        .from('bomb_party_rooms')
+        .select('room_code, status')
+        .eq('room_code', savedRoom)
+        .in('status', ['waiting', 'playing'])
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setReconnectRoom(data.room_code);
+          } else {
+            localStorage.removeItem(RECONNECT_KEY);
+          }
+        });
+    }
+  }, []);
+
+  // Auto-join if URL has room code
+  useEffect(() => {
+    if (urlRoomCode && !roomState) {
+      // The lobby will handle auto-joining via the initialJoinCode prop
+    }
+  }, [urlRoomCode]);
+
+  // Update URL when room state changes
+  useEffect(() => {
+    if (roomState?.roomCode) {
+      // Save to localStorage for reconnection
+      localStorage.setItem(RECONNECT_KEY, roomState.roomCode);
+      // Update URL without full navigation
+      const currentPath = window.location.pathname;
+      const expectedPath = `/bomb-party/${roomState.roomCode}`;
+      if (currentPath !== expectedPath) {
+        navigate(expectedPath, { replace: true });
+      }
+    } else {
+      // Clear when leaving
+      localStorage.removeItem(RECONNECT_KEY);
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/bomb-party') {
+        navigate('/bomb-party', { replace: true });
+      }
+    }
+  }, [roomState?.roomCode, navigate]);
+
   const updateRoomState = useCallback((update: RoomState | null | ((prev: RoomState | null) => RoomState | null)) => {
     if (typeof update === 'function') {
       setRoomState(update);
@@ -57,6 +112,15 @@ const BombParty: React.FC = () => {
       setRoomState(update);
     }
   }, []);
+
+  const handleReconnect = () => {
+    if (reconnectRoom) {
+      navigate(`/bomb-party/${reconnectRoom}`);
+      setReconnectRoom(null);
+      // The lobby will auto-join using the URL param
+      window.location.reload();
+    }
+  };
 
   return (
     <PageAnimator className="relative w-full overflow-hidden px-4 pb-14 pt-8 sm:px-margin">
@@ -80,6 +144,27 @@ const BombParty: React.FC = () => {
           </p>
         </div>
 
+        {/* Reconnect banner */}
+        {reconnectRoom && !roomState && (
+          <div className="mb-6 rounded-[2rem] border-[4px] border-black bg-orange-900/40 p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-[28px]">🔌</span>
+                <div>
+                  <p className="font-headline-md text-[16px] text-white">Partita in corso trovata!</p>
+                  <p className="font-body-sm text-on-surface-variant">Stanza: {reconnectRoom}</p>
+                </div>
+              </div>
+              <button
+                onClick={handleReconnect}
+                className="rounded-xl border-[3px] border-black bg-green-600 px-6 py-3 font-headline-md text-[14px] text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-1 active:translate-x-1 active:translate-y-1 active:shadow-none"
+              >
+                RICONNETTITI
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Game content */}
         {!roomState || roomState.status === 'waiting' ? (
           <BombPartyLobby
@@ -87,6 +172,7 @@ const BombParty: React.FC = () => {
             setNickname={setNickname}
             roomState={roomState}
             setRoomState={updateRoomState}
+            initialJoinCode={urlRoomCode}
           />
         ) : (
           <BombPartyGame

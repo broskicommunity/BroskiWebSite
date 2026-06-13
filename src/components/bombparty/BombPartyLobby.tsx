@@ -74,7 +74,6 @@ const BombPartyLobby: React.FC<Props> = ({ nickname, setNickname, roomState, set
       setTimeout(() => setLinkCopied(false), 2000);
     });
   };
-  }, []);
 
   // Subscribe to Presence + Broadcast for real-time player sync
   const subscribeToRoom = useCallback((

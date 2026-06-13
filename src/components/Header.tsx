@@ -193,6 +193,14 @@ const Header: React.FC = () => {
                   )}
                 </TransitionLink>
               )}
+              <TransitionLink
+                to="/bomb-party"
+                onClick={() => setMenuOpen(false)}
+                className="flex w-full items-center gap-2 rounded-xl border-[3px] border-black bg-orange-600 px-3 py-2 font-label-caps text-[12px] text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5 active:translate-x-1 active:translate-y-1 active:shadow-none"
+              >
+                <span className="material-symbols-outlined text-[18px]">bomb</span>
+                Bomb Party
+              </TransitionLink>
               <button
                 onClick={() => { signOut(); setMenuOpen(false); }}
                 className="flex w-full items-center gap-2 rounded-xl border-[3px] border-black bg-error-container px-3 py-2 font-label-caps text-[12px] text-on-error-container shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:-translate-y-0.5 active:translate-x-1 active:translate-y-1 active:shadow-none"

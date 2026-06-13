@@ -36,6 +36,7 @@ import IdeaSubmit from './pages/IdeaSubmit'
 import MyIdeas from './pages/MyIdeas'
 import Profile from './pages/Profile'
 import BombParty from './pages/BombParty'
+import BombPartyDebug from './pages/BombPartyDebug'
 
 function App() {
   return (
@@ -81,6 +82,7 @@ function App() {
                   <Route path="/admin" element={<RequireAuth><RequireAdmin><AdminPanel /></RequireAdmin></RequireAuth>} />
                   <Route path="/bomb-party" element={<BombParty />} />
                   <Route path="/bomb-party/:roomCode" element={<BombParty />} />
+                  <Route path="/bomb-party-debug" element={<BombPartyDebug />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </div>

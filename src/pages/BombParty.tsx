@@ -42,12 +42,13 @@ export interface RoomState {
 const RECONNECT_KEY = 'bombparty_active_room';
 
 const BombParty: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const { roomCode: urlRoomCode } = useParams<{ roomCode?: string }>();
   const navigate = useNavigate();
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [nickname, setNickname] = useState(profile?.minecraft_username || '');
   const [reconnectRoom, setReconnectRoom] = useState<string | null>(null);
+  const [attemptingReconnect, setAttemptingReconnect] = useState(false);
 
   // Sync nickname when profile loads
   useEffect(() => {
@@ -56,11 +57,11 @@ const BombParty: React.FC = () => {
     }
   }, [profile?.minecraft_username]);
 
-  // Check for active room to reconnect to
+  // Check for active room to reconnect to (only when on base /bomb-party without URL code)
   useEffect(() => {
+    if (authLoading) return;
     const savedRoom = localStorage.getItem(RECONNECT_KEY);
     if (savedRoom && !roomState && !urlRoomCode) {
-      // Verify room still exists and is active
       supabase
         .from('bomb_party_rooms')
         .select('room_code, status')
@@ -75,35 +76,61 @@ const BombParty: React.FC = () => {
           }
         });
     }
-  }, []);
+  }, [authLoading]);
 
-  // Auto-join if URL has room code
+  // Direct reconnect: if URL has room code AND we have a nickname, try to reconnect to active game
   useEffect(() => {
-    if (urlRoomCode && !roomState) {
-      // The lobby will handle auto-joining via the initialJoinCode prop
-    }
-  }, [urlRoomCode]);
+    if (!urlRoomCode || roomState || authLoading || attemptingReconnect) return;
+    const myNickname = nickname || profile?.minecraft_username;
+    if (!myNickname) return;
+
+    setAttemptingReconnect(true);
+
+    supabase
+      .from('bomb_party_rooms')
+      .select('status, game_state, settings, host_id')
+      .eq('room_code', urlRoomCode.toUpperCase())
+      .single()
+      .then(({ data }) => {
+        if (!data) {
+          setAttemptingReconnect(false);
+          return;
+        }
+
+        // If game is playing and I'm in the players, reconnect directly to the game
+        if (data.status === 'playing' && data.game_state) {
+          const savedState = data.game_state as RoomState;
+          const myPlayerInGame = savedState.players.find(p => p.nickname === myNickname);
+          if (myPlayerInGame) {
+            // Direct reconnect to active game!
+            setRoomState(savedState);
+            setAttemptingReconnect(false);
+            return;
+          }
+        }
+
+        // Otherwise let the lobby handle the normal join flow
+        setAttemptingReconnect(false);
+      });
+  }, [urlRoomCode, authLoading, nickname, profile?.minecraft_username]);
 
   // Update URL when room state changes
   useEffect(() => {
     if (roomState?.roomCode) {
-      // Save to localStorage for reconnection
       localStorage.setItem(RECONNECT_KEY, roomState.roomCode);
-      // Update URL without full navigation
       const currentPath = window.location.pathname;
       const expectedPath = `/bomb-party/${roomState.roomCode}`;
       if (currentPath !== expectedPath) {
         navigate(expectedPath, { replace: true });
       }
-    } else {
-      // Clear when leaving
+    } else if (!attemptingReconnect) {
       localStorage.removeItem(RECONNECT_KEY);
       const currentPath = window.location.pathname;
-      if (currentPath !== '/bomb-party') {
+      if (currentPath !== '/bomb-party' && !urlRoomCode) {
         navigate('/bomb-party', { replace: true });
       }
     }
-  }, [roomState?.roomCode, navigate]);
+  }, [roomState?.roomCode, navigate, attemptingReconnect]);
 
   const updateRoomState = useCallback((update: RoomState | null | ((prev: RoomState | null) => RoomState | null)) => {
     if (typeof update === 'function') {
@@ -119,6 +146,18 @@ const BombParty: React.FC = () => {
       navigate(`/bomb-party/${reconnectRoom}`, { replace: true });
     }
   };
+
+  // Show loading while attempting reconnect
+  if (attemptingReconnect) {
+    return (
+      <PageAnimator className="flex min-h-[calc(100vh-76px)] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-container border-t-transparent" />
+          <p className="font-body-lg text-on-surface-variant">Riconnessione in corso...</p>
+        </div>
+      </PageAnimator>
+    );
+  }
 
   return (
     <PageAnimator className="relative w-full overflow-hidden px-4 pb-14 pt-8 sm:px-margin">

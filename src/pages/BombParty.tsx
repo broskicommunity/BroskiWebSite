@@ -170,7 +170,7 @@ const BombParty: React.FC = () => {
   const subscribeToChannel = useCallback((
     roomCode: string,
     myPlayer: BombPartyPlayer,
-    roomSettings: RoomSettings,
+    _roomSettings: RoomSettings,
     isHost: boolean
   ) => {
     // Remove existing channel if any

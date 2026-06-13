@@ -792,14 +792,7 @@ const BombPartyGame: React.FC<Props> = ({ roomState, setRoomState, nickname, cha
               </span>
             </div>
 
-            {/* Numeric timer chip */}
-            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-30">
-              <span className={`inline-block rounded-full border-[3px] border-black px-3 py-0.5 font-headline-md text-[16px] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
-                timeLeft <= 2 ? 'bg-red-600 text-white' : timeLeft <= 4 ? 'bg-orange-500 text-white' : 'bg-surface-container-highest text-white'
-              }`}>
-                {timeLeft}s
-              </span>
-            </div>
+            {/* Numeric timer chip — removed, ring is the only time indicator */}
           </div>
         </div>
 

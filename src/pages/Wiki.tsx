@@ -134,7 +134,7 @@ const Wiki: React.FC = () => {
                     {t('wiki.community.discord.desc')}
                   </p>
                 </InfoCard>
-                <InfoCard title="??? SMP" icon="dns">
+                <InfoCard title="Le SMP" icon="dns">
                   <p className="text-sm text-on-surface-variant">
                     {t('wiki.community.smp.desc')}
                   </p>
@@ -167,7 +167,7 @@ const Wiki: React.FC = () => {
           <WikiSection icon="dns" title={t('wiki.smp.title')}>
             <div className="space-y-4">
               <p>
-                <strong className="text-white">??? SMP</strong> {t('wiki.smp.intro')}
+                <strong className="text-white">Le nostre SMP</strong> {t('wiki.smp.intro')}
               </p>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -175,7 +175,7 @@ const Wiki: React.FC = () => {
                   <ul className="list-inside list-disc space-y-1 text-sm text-on-surface-variant">
                     <li>{t('wiki.smp.features.java')}</li>
                     <li>{t('wiki.smp.features.survival')}</li>
-                    <li>Community-driven lore</li>
+                    <li>Semi-script</li>
                     <li>{t('wiki.smp.features.events')}</li>
                     <li>{t('wiki.smp.features.youtube')}</li>
                   </ul>
@@ -256,16 +256,15 @@ const Wiki: React.FC = () => {
                 <h3 className="mb-3 font-headline-md text-[20px] text-white">{t('wiki.tierlist.categories.title')}</h3>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                   {[
-                    { name: 'LTMS', icon: 'timer', desc: 'Last Man Standing' },
-                    { name: 'VANILLA', icon: 'grass', desc: 'PvP Vanilla' },
-                    { name: 'UHC', icon: 'heart_broken', desc: 'Ultra Hardcore' },
-                    { name: 'POT', icon: 'local_drink', desc: 'Potions PvP' },
-                    { name: 'NETHOP', icon: 'whatshot', desc: 'Nether PvP' },
-                    { name: 'SMP', icon: 'groups', desc: 'SMP Survival' },
-                    { name: 'SWORD', icon: 'swords', desc: 'Sword Only' },
-                    { name: 'AXE', icon: 'hardware', desc: 'Axe PvP' },
-                    { name: 'MACE', icon: 'auto_fix_high', desc: 'Mace PvP' },
-                    { name: 'CRYSTAL', icon: 'diamond', desc: 'Crystal PvP' },
+                    { name: 'SWORD', icon: 'timer', desc: 'Last Man Standing' },
+                    { name: 'AXE', icon: 'grass', desc: 'PvP Vanilla' },
+                    { name: 'MACE', icon: 'heart_broken', desc: 'Ultra Hardcore' },
+                    { name: 'SPEAR MACE', icon: 'local_drink', desc: 'Potions PvP' },
+                    { name: 'SMP', icon: 'whatshot', desc: 'Nether PvP' },
+                    { name: 'DIA SMP', icon: 'groups', desc: 'SMP Survival' },
+                    { name: 'CART PVP', icon: 'swords', desc: 'Sword Only' },
+                    { name: 'VANILLA', icon: 'hardware', desc: 'Axe PvP' },
+                    { name: 'NETHOP', icon: 'auto_fix_high', desc: 'Mace PvP' }
                   ].map(cat => (
                     <div key={cat.name} className="flex flex-col items-center gap-2 rounded-xl border-[2px] border-black bg-surface-container p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
                       <img src={`/icons/categories/${cat.name.toLowerCase()}.svg`} alt="" className="h-8 w-8" />

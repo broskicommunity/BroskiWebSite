@@ -28,7 +28,7 @@ const BombPartyDebug: React.FC = () => {
   const players = FAKE_PLAYERS.slice(0, playerCount);
 
   const [roomState, setRoomStateRaw] = useState<RoomState>({
-    roomCode: 'DEBUG',
+    roomCode: 'D3BU6',
     players,
     status: 'playing',
     currentTurnIndex: currentTurn,

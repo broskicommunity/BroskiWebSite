@@ -1,5 +1,5 @@
 export const LINKS_CONFIG = {
-  discord: 'discord.ibroski.net', // Sostituisci con il link reale
+  discord: 'https://discord.ibroski.net', // Sostituisci con il link reale
   github: 'https://github.com/broskicommunity',
   map: 'https://map.broskismp.it',
   store: 'https://store.broskismp.it',
